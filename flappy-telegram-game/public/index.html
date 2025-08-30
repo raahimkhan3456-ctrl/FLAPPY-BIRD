@@ -1,0 +1,133 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Flappy Bird – Telegram</title>
+  <style>
+    html,body{margin:0;height:100%;background:#222;display:grid;place-items:center}
+    canvas{background:#70c5ce;box-shadow:0 10px 30px rgba(0,0,0,.3);border-radius:16px}
+    #ui{position:fixed;top:12px;left:12px;right:12px;display:flex;justify-content:space-between;align-items:center;color:#fff;font:16px system-ui}
+    button{border:0;padding:10px 14px;border-radius:12px;cursor:pointer}
+  </style>
+</head>
+<body>
+  <div id="ui">
+    <div>Score: <span id="score">0</span></div>
+    <button id="restart">Restart</button>
+  </div>
+  <canvas id="game" width="360" height="640"></canvas>
+  <script>
+  // Simple Flappy clone. Tap/space to flap. Mobile friendly.
+  const c = document.getElementById('game');
+  const ctx = c.getContext('2d');
+  const scoreEl = document.getElementById('score');
+  const restartBtn = document.getElementById('restart');
+
+  const G = 0.45;             // gravity
+  const FLAP = -8.5;          // jump impulse
+  const PIPE_GAP = 140;       // gap size
+  const PIPE_SPACING = 200;   // horizontal spacing
+  const PIPE_W = 60;
+  const FLOOR = c.height - 80;
+
+  let bird, pipes, score, best=0, running=true, started=false;
+
+  function reset(){
+    bird = {x: 80, y: c.height/2, vy: 0, r: 14};
+    pipes = [];
+    score = 0; scoreEl.textContent = 0;
+    running = true; started = false;
+    spawnPipes();
+  }
+
+  function spawnPipes(){
+    pipes = [];
+    for(let i=0;i<4;i++) addPipe(i*PIPE_SPACING + 300);
+  }
+  function addPipe(x){
+    const topH = 50 + Math.random()*(FLOOR-PIPE_GAP-150);
+    pipes.push({x, topH, passed:false});
+  }
+
+  function flap(){
+    if(!running){ reset(); return; }
+    bird.vy = FLAP; started = true;
+  }
+
+  window.addEventListener('keydown', e=>{ if(e.code==='Space'||e.code==='ArrowUp') { e.preventDefault(); flap(); } });
+  c.addEventListener('pointerdown', flap);
+  restartBtn.addEventListener('click', reset);
+
+  function update(){
+    if(started) bird.vy += G;
+    bird.y += bird.vy;
+
+    // floor and ceiling
+    if(bird.y+bird.r > FLOOR){ bird.y=FLOOR-bird.r; running=false; }
+    if(bird.y-bird.r < 0){ bird.y = bird.r; bird.vy=0; }
+
+    // move pipes
+    for(const p of pipes){
+      p.x -= 2.2;
+      // recycle pipe
+      if(p.x + PIPE_W < 0){
+        const lastX = pipes[pipes.length-1].x;
+        pipes.shift();
+        addPipe(lastX + PIPE_SPACING);
+      }
+      // scoring
+      if(!p.passed && p.x + PIPE_W < bird.x){
+        p.passed = true; score++; scoreEl.textContent = score;
+      }
+    }
+
+    // collisions
+    for(const p of pipes){
+      const inX = bird.x + bird.r > p.x && bird.x - bird.r < p.x + PIPE_W;
+      const gapTop = p.topH;
+      const gapBot = p.topH + PIPE_GAP;
+      const hitTop = bird.y - bird.r < gapTop;
+      const hitBot = bird.y + bird.r > gapBot;
+      if(inX && (hitTop || hitBot)) running=false;
+    }
+  }
+
+  function draw(){
+    // sky
+    ctx.fillStyle = '#70c5ce';
+    ctx.fillRect(0,0,c.width,c.height);
+
+    // ground
+    ctx.fillStyle = '#ded895';
+    ctx.fillRect(0,FLOOR,c.width,c.height-FLOOR);
+
+    // pipes
+    for(const p of pipes){
+      ctx.fillStyle = '#4ec04e';
+      ctx.fillRect(p.x, 0, PIPE_W, p.topH);
+      ctx.fillRect(p.x, p.topH+PIPE_GAP, PIPE_W, FLOOR-(p.topH+PIPE_GAP));
+    }
+
+    // bird
+    ctx.beginPath();
+    ctx.fillStyle = '#ffeb3b';
+    ctx.arc(bird.x, bird.y, bird.r, 0, Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle = '#333';
+    ctx.beginPath();
+    ctx.arc(bird.x+6, bird.y-4, 3, 0, Math.PI*2);
+    ctx.fill();
+  }
+
+  function loop(){
+    if(running) update();
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  reset();
+  loop();
+  </script>
+</body>
+</html>
